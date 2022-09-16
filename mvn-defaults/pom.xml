@@ -611,6 +611,7 @@
                     </includes>
                     <excludes>
                         <exclude>**/generated/**</exclude>
+                        <exclude>**/generated-sources/**</exclude>
                     </excludes>
                     <addLicenseHeaders>true</addLicenseHeaders>
                     <copyrightMessage>Copyright (c) 2022 nosqlbench</copyrightMessage>

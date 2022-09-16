@@ -99,7 +99,7 @@ public class NBCLI implements Function<String[], Integer> {
      *     }
      *
      *     public static void main(String[] args) {
-     * @param strings
+     * @param args
      * @return
      */
     @Override
@@ -396,6 +396,12 @@ public class NBCLI implements Function<String[], Integer> {
                 String interval = "1s";
                 options.setHistoLoggerConfigs(pattern, file, interval);
             }
+        }
+
+
+        for (
+            NBCLIOptions.PromExportConfigData promExport : options.getPromExportConfigs()) {
+            ActivityMetrics.addPromExport(sessionName, promExport.url, promExport.pattern, promExport.interval);
         }
 
         for (

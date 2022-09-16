@@ -109,6 +109,7 @@ public class NBCLIOptions {
     private static final String CONSOLE_PATTERN = "--console-pattern";
     private static final String LOGFILE_PATTERN = "--logfile-pattern";
     private static final String LOG_HISTOGRAMS = "--log-histograms";
+    private static final String PROM_EXPORT= "--prom-export";
     private static final String LOG_HISTOSTATS = "--log-histostats";
     private static final String CLASSIC_HISTOGRAMS = "--classic-histograms";
     private final static String LOG_LEVEL_OVERRIDE = "--log-level-override";
@@ -145,6 +146,7 @@ public class NBCLIOptions {
     private boolean showScript = false;
     private NBLogLevel consoleLevel = NBLogLevel.WARN;
     private final List<String> histoLoggerConfigs = new ArrayList<>();
+    private final List<String> promExportConfigs = new ArrayList<>();
     private final List<String> statsLoggerConfigs = new ArrayList<>();
     private final List<String> classicHistoConfigs = new ArrayList<>();
     private String progressSpec = "console:1m";
@@ -564,6 +566,11 @@ public class NBCLIOptions {
                     String logto = arglist.removeFirst();
                     histoLoggerConfigs.add(logto);
                     break;
+                case PROM_EXPORT:
+                    arglist.removeFirst();
+                    String url = arglist.removeFirst();
+                    promExportConfigs.add(url);
+                    break;
                 case LOG_HISTOSTATS:
                     arglist.removeFirst();
                     String logStatsTo = arglist.removeFirst();
@@ -676,6 +683,12 @@ public class NBCLIOptions {
         return engine;
     }
 
+
+    public List<PromExportConfigData> getPromExportConfigs() {
+        List<PromExportConfigData> configs =
+            promExportConfigs.stream().map(PromExportConfigData::new).collect(Collectors.toList());
+        return configs;
+    }
     public List<LoggerConfigData> getHistoLoggerConfigs() {
         List<LoggerConfigData> configs =
                 histoLoggerConfigs.stream().map(LoggerConfigData::new).collect(Collectors.toList());
@@ -915,6 +928,32 @@ public class NBCLIOptions {
         return docker_prom_tag;
     }
 
+    public static class PromExportConfigData {
+        public String url;
+        public String pattern = ".*";
+        public String interval = "30 seconds";
+
+        public PromExportConfigData(String promExportSpec) {
+            String[] words = promExportSpec.split(":");
+            switch (words.length) {
+                case 3:
+                    interval = words[2].isEmpty() ? interval : words[2];
+                case 2:
+                    pattern = words[1].isEmpty() ? pattern : words[1];
+                case 1:
+                    url = words[0];
+                    if (url.isEmpty()) {
+                        throw new RuntimeException("You must pass a prom remote_write URL for --prom-export.");
+                    }
+                    break;
+                default:
+                    throw new RuntimeException(
+                        PROM_EXPORT +
+                            " options must be in either 'regex:url:interval' or 'regex:url' or 'url' format"
+                    );
+            }
+        }
+    }
     public static class LoggerConfigData {
         public String file;
         public String pattern = ".*";

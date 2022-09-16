@@ -242,6 +242,17 @@ public class ActivityMetrics {
         return get();
     }
 
+    public static void addPromExport(String name, String url, String pattern, String interval) {
+        Pattern compiledPattern = Pattern.compile(pattern);
+        long intervalMillis = Unit.msFor(interval).orElseThrow(() -> new RuntimeException("Unable to parse interval spec:'" + interval + "'"));
+
+        HistoStatsPrometheusAttachment promExport =
+            new HistoStatsPrometheusAttachment(name, url, compiledPattern, intervalMillis);
+        logger.debug("attaching " + promExport + " to the metrics registry.");
+        get().addListener(promExport);
+        metricsCloseables.add(promExport);
+    }
+
     /**
      * Add a histogram interval logger to matching metrics in this JVM instance.
      *
