@@ -1,7 +1,7 @@
 {
-  "name":"prometheus",
+  "name":"victoria-metrics",
   "type":"prometheus",
-  "url":"http://prom:9090",
+  "url":"http://victoria-metrics:8428",
   "access":"proxy",
   "editable":true,
   "basicAuth":false

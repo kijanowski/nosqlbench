@@ -30,14 +30,15 @@ import com.github.dockerjava.core.async.ResultCallbackTemplate;
 import com.github.dockerjava.core.command.LogContainerResultCallback;
 import io.nosqlbench.api.content.Content;
 import io.nosqlbench.api.content.NBIO;
-import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
 
 import static io.nosqlbench.engine.docker.RestHelper.post;
@@ -64,37 +65,39 @@ public class DockerMetricsManager {
 
     public void startMetrics(Map<String, String> options) {
 
-        String ip = startGraphite(
-                options.get(GRAPHITE_SAMPLE_EXPIRY),
-                options.get(GRAPHITE_CACHE_SIZE),
-                options.get(GRAPHITE_LOG_LEVEL),
-                options.get(GRAPHITE_LOG_FORMAT)
-            );
+        String victoriaIp= startVictoriaDocker();
+//        String ip = startGraphite(
+//                options.get(GRAPHITE_SAMPLE_EXPIRY),
+//                options.get(GRAPHITE_CACHE_SIZE),
+//                options.get(GRAPHITE_LOG_LEVEL),
+//                options.get(GRAPHITE_LOG_FORMAT)
+//            );
 
-        startPrometheus(ip, options.get(PROM_TAG), options.get(TSDB_RETENTION));
+//        startPrometheus(ip, options.get(PROM_TAG), options.get(TSDB_RETENTION));
 
-        startGrafana(ip, options.get(GRAFANA_TAG));
+        startGrafana(victoriaIp, options.get(GRAFANA_TAG));
 
     }
+
 
     private void startGrafana(String ip, String tag) {
 
         String GRAFANA_IMG = "grafana/grafana";
         tag = (tag == null || tag.isEmpty()) ? "latest" : tag;
         String name = "grafana";
-        List<Integer> port = Arrays.asList(3000);
+        List<Integer> port = List.of(3000);
 
         boolean grafanaFilesExist = grafanaFilesExist();
         if (!grafanaFilesExist) {
             setupGrafanaFiles(ip);
         }
 
-        List<String> volumeDescList = Arrays.asList(
-                userHome + "/.nosqlbench/grafana:/var/lib/grafana:rw"
-                //cwd+"/docker-metrics/grafana:/grafana",
-                //cwd+"/docker-metrics/grafana/datasources:/etc/grafana/provisioning/datasources",
-                //cwd+"/docker-metrics/grafana/dashboardconf:/etc/grafana/provisioning/dashboards"
-                //,cwd+"/docker-metrics/grafana/dashboards:/var/lib/grafana/dashboards:ro"
+        List<String> volumeDescList = List.of(
+            userHome + "/.nosqlbench/grafana:/var/lib/grafana:rw"
+            //cwd+"/docker-metrics/grafana:/grafana",
+            //cwd+"/docker-metrics/grafana/datasources:/etc/grafana/provisioning/datasources",
+            //cwd+"/docker-metrics/grafana/dashboardconf:/etc/grafana/provisioning/dashboards"
+            //,cwd+"/docker-metrics/grafana/dashboards:/var/lib/grafana/dashboards:ro"
         );
         List<String> envList = Arrays.asList(
                 "GF_SECURITY_ADMIN_PASSWORD=admin",
@@ -105,7 +108,7 @@ public class DockerMetricsManager {
 
         String reload = null;
         List<String> linkNames = new ArrayList();
-        linkNames.add("prom");
+        linkNames.add("victoria-metrics");
         String containerId = dh.startDocker(GRAFANA_IMG, tag, name, port, volumeDescList, envList, null, reload, linkNames);
         if (containerId == null) {
             return;
@@ -125,7 +128,7 @@ public class DockerMetricsManager {
         logger.info("preparing to start docker metrics");
         String PROMETHEUS_IMG = "prom/prometheus";
         String name = "prom";
-        List<Integer> port = Arrays.asList(9090);
+        List<Integer> port = List.of(9090);
 
         if (!promFilesExist()) {
             setupPromFiles(ip);
@@ -156,6 +159,58 @@ public class DockerMetricsManager {
         logger.info("prometheus started and listening");
     }
 
+    private String startVictoriaDocker() {
+        logger.info("preparing to start victoria metrics container...");
+
+        String VICTORIA_IMG="victoriametrics/victoria-metrics";
+        String victoriaTag = "latest";
+
+        String victoriaName = "victoria-metrics";
+        List<Integer> port = List.of(8428);
+
+        File nosqlbenchdir = new File(userHome, "/.nosqlbench/");
+        Path victoriaStateDir = Path.of(userHome, "/.nosqlbench/victoria-metrics");
+        try {
+            Files.createDirectories(victoriaStateDir, PosixFilePermissions.asFileAttribute(
+                PosixFilePermissions.fromString("rwxrwx---")
+            ));
+        } catch (Exception e) {
+            logger.error("failed to create directory or set permissions on '" + victoriaStateDir.toAbsolutePath()+"'");
+            throw new RuntimeException(e);
+        }
+        List<String> volumes=List.of(victoriaStateDir+":/victoria-metrics-data");
+
+        /*
+        https://docs.victoriametrics.com/#list-of-command-line-flags
+
+        -retentionPeriod value
+        Data with timestamps outside the retentionPeriod is automatically deleted
+        The following optional suffixes are supported: h (hour), d (day), w (week), y (year).
+        If suffix isn't set, then the duration is counted in months (default 1)
+
+         */
+        List<String> cmdOpts = List.of(
+            "-retentionPeriod=5y"
+        );
+
+        dh.startDocker(VICTORIA_IMG,victoriaTag,victoriaName,port,volumes, List.<String>of(),cmdOpts,null, List.<String>of());
+
+        logger.info("victoria metrics container started");
+        logger.info("searching for victoria metrics container endpoint...");
+
+        ContainerNetworkSettings settings = dh.searchContainer(victoriaName, null, victoriaTag).getNetworkSettings();
+        Map<String, ContainerNetwork> networks = settings.getNetworks();
+
+        String victoriaIp = null;
+        for (String key : networks.keySet()) {
+            ContainerNetwork network = networks.get(key);
+            victoriaIp = network.getIpAddress();
+        }
+
+        return victoriaIp;
+
+    }
+
     private String startGraphite(
         String graphite_sample_expiry,
         String graphite_cache_size,
@@ -175,7 +230,7 @@ public class DockerMetricsManager {
 
         setupGraphiteFiles(volumeDescList);
 
-        List<String> envList = Arrays.asList();
+        List<String> envList = List.of();
 
         String reload = null;
         List<String> linkNames = new ArrayList();
