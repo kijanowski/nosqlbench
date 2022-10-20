@@ -167,7 +167,7 @@ public class NBCLIOptions {
     private final List<String> wantsToIncludePaths = new ArrayList<>();
     private Scenario.Engine engine = Scenario.Engine.Graalvm;
     private int hdr_digits = 3;
-    private String docker_grafana_tag = "7.3.4";
+    private String docker_grafana_tag = "9.2.1";
     private String docker_prom_tag = "latest";
     private boolean showStackTraces = false;
     private boolean compileScript = false;
