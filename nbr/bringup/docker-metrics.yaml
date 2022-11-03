@@ -1,0 +1,33 @@
+#
+# https://docs.docker.com/compose/
+# https://docs.docker.com/compose/compose-file/
+#
+volumes:
+ grafana:
+ victoria-metrics-data:
+ 
+services:
+  # https://hub.docker.com/r/victoriametrics/victoria-metrics
+  victoria:
+    image: "victoriametrics/victoria-metrics:latest"
+    ports:
+     - "8428:8428"
+    volumes:
+     - ${HOME}/.nosqlbench/victoria-metrics-data:/victoria-metrics-data:rw
+    user: "${USER_ID}:${GROUP_ID}"
+#  container_name: victoria
+
+  # https://hub.docker.com/r/grafana/grafana/
+  grafana:
+    image: "grafana/grafana:9.1.6"
+    ports:
+     - "3000:3000"
+    volumes:
+     - ${HOME}/.nosqlbench/grafana:/var/lib/grafana:rw
+    user: "${USER_ID}:${GROUP_ID}"
+    depends_on:
+     - victoria
+    links:
+     - victoria
+#    container_name: grafana
+
