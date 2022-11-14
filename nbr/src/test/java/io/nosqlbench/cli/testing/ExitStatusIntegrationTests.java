@@ -78,7 +78,7 @@ public class ExitStatusIntegrationTests {
         invoker.setLogDir("logs/test");
         ProcessResult result = invoker.run("exitstatus_asyncstoprequest", 30,
                 java, "-jar", JARNAME, "--logs-dir", "logs/test/asyncstop", "run",
-            "driver=diag", "cyclerate=5", "op=erroroncycle:erroroncycle=10", "cycles=2000", "-vvv"
+            "driver=diag", "cyclerate=1", "op=erroroncycle:erroroncycle=10", "cycles=2000", "-vvv"
         );
         assertThat(result.exception).isNull();
         String stdout = result.getStdoutData().stream().collect(Collectors.joining("\n"));
