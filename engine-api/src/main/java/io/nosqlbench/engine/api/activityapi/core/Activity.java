@@ -18,6 +18,8 @@ package io.nosqlbench.engine.api.activityapi.core;
 
 import com.codahale.metrics.Timer;
 import io.nosqlbench.api.config.NBNamedElement;
+import io.nosqlbench.api.engine.activityimpl.ActivityDef;
+import io.nosqlbench.api.engine.activityimpl.ParameterMap;
 import io.nosqlbench.engine.api.activityapi.core.progress.ProgressCapable;
 import io.nosqlbench.engine.api.activityapi.core.progress.StateCapable;
 import io.nosqlbench.engine.api.activityapi.cyclelog.filters.IntPredicateDispenser;
@@ -25,13 +27,10 @@ import io.nosqlbench.engine.api.activityapi.errorhandling.ErrorMetrics;
 import io.nosqlbench.engine.api.activityapi.input.InputDispenser;
 import io.nosqlbench.engine.api.activityapi.output.OutputDispenser;
 import io.nosqlbench.engine.api.activityapi.ratelimits.RateLimiter;
-import io.nosqlbench.api.engine.activityimpl.ActivityDef;
-import io.nosqlbench.api.engine.activityimpl.ParameterMap;
 import io.nosqlbench.engine.api.activityimpl.SimpleActivity;
 
 import java.io.InputStream;
 import java.io.PrintWriter;
-import java.util.function.Supplier;
 
 /**
  * Provides the components needed to build and run an activity a runtime.
@@ -115,23 +114,6 @@ public interface Activity extends Comparable<Activity>, ActivityDefObserver, Pro
     RateLimiter getCycleLimiter();
 
     /**
-     * Set the cycle rate limiter for this activity. This method should only
-     * be used in a non-concurrent context. Otherwise, the supplier version
-     * {@link #getCycleRateLimiter(Supplier)} should be used.
-     * @param rateLimiter The cycle {@link RateLimiter} for this activity
-     */
-    void setCycleLimiter(RateLimiter rateLimiter);
-
-    /**
-     * Get or create the cycle rate limiter in a safe way. Implementations
-     * should ensure that this method is synchronized or that each requester
-     * gets the same cycle rate limiter for the activity.
-     * @param supplier A {@link RateLimiter} {@link Supplier}
-     * @return An extant or newly created cycle {@link RateLimiter}
-     */
-    RateLimiter getCycleRateLimiter(Supplier<? extends RateLimiter> supplier);
-
-    /**
      * Get the current stride rate limiter for this activity.
      * The stride rate limiter is used to throttle the rate at which
      * new strides are dispatched across all threads in an activity.
@@ -139,49 +121,8 @@ public interface Activity extends Comparable<Activity>, ActivityDefObserver, Pro
      */
     RateLimiter getStrideLimiter();
 
-    /**
-     * Set the stride rate limiter for this activity. This method should only
-     * be used in a non-concurrent context. Otherwise, the supplier version
-     * {@link #getStrideRateLimiter(Supplier)}} should be used.
-     * @param rateLimiter The stride {@link RateLimiter} for this activity.
-     */
-    void setStrideLimiter(RateLimiter rateLimiter);
-
-    /**
-     * Get or create the stride {@link RateLimiter} in a concurrent-safe
-     * way. Implementations should ensure that this method is synchronized or
-     * that each requester gets the same stride rate limiter for the activity.
-     * @param supplier A {@link RateLimiter} {@link Supplier}
-     * @return An extant or newly created stride {@link RateLimiter}
-     */
-    RateLimiter getStrideRateLimiter(Supplier<? extends RateLimiter> supplier);
-
-    /**
-     * Get the current phase rate limiter for this activity.
-     * The phase rate limiter is used to throttle the rate at which
-     * new phases are dispatched across all threads in an activity.
-     * @return The stride {@link RateLimiter}
-     */
-    RateLimiter getPhaseLimiter();
 
     Timer getResultTimer();
-
-    /**
-     * Set the phase rate limiter for this activity. This method should only
-     * be used in a non-concurrent context. Otherwise, the supplier version
-     * {@link #getPhaseRateLimiter(Supplier)}} should be used.
-     * @param rateLimiter The phase {@link RateLimiter} for this activity.
-     */
-    void setPhaseLimiter(RateLimiter rateLimiter);
-
-    /**
-     * Get or create the phase {@link RateLimiter} in a concurrent-safe
-     * way. Implementations should ensure that this method is synchronized or
-     * that each requester gets the same phase rate limiter for the activity.
-     * @param supplier A {@link RateLimiter} {@link Supplier}
-     * @return An extant or newly created phase {@link RateLimiter}
-     */
-    RateLimiter getPhaseRateLimiter(Supplier<? extends RateLimiter> supplier);
 
     /**
      * Get or create the instrumentation needed for this activity. This provides
@@ -200,16 +141,6 @@ public interface Activity extends Comparable<Activity>, ActivityDefObserver, Pro
 
     ErrorMetrics getExceptionMetrics();
 
-//    /**
-//     * When a driver needs to identify an error uniquely for the purposes of
-//     * routing it to the correct error handler, or naming it in logs, or naming
-//     * metrics, override this method in your activity.
-//     * @return A function that can reliably and safely map an instance of Throwable to a stable name.
-//     */
-//    default Function<Throwable,String> getErrorNameMapper() {
-//        return t -> t.getClass().getSimpleName();
-//    }
-//
     int getMaxTries();
 
     default int getHdrDigits() {

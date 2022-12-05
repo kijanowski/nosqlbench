@@ -16,6 +16,9 @@
 
 package io.nosqlbench.api.config.standard;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -35,6 +38,7 @@ public class Param<T> {
     public boolean required;
     private Pattern regex;
     private final NBConfigModelExpander expander;
+    private final List<String> notWith=new ArrayList<>();
 
     public Param(
         List<String> names,
@@ -173,6 +177,10 @@ public class Param<T> {
         return new Param<V>(names, type, null, true, null, null);
     }
 
+    public Param<T>  notWith(String... notWiths) {
+        this.notWith.addAll(Arrays.asList(notWiths));
+        return this;
+    }
 
     @Override
     public String toString() {
@@ -265,6 +273,11 @@ public class Param<T> {
     public Param<T> expand(NBConfigModelExpander expander) {
         return new Param<>(names, type, description, required, defaultValue, expander);
     }
+
+    public List<String> getNotWith() {
+        return Collections.unmodifiableList(this.notWith);
+    }
+
 
     public final static class CheckResult<T> {
         public final Param<T> element;

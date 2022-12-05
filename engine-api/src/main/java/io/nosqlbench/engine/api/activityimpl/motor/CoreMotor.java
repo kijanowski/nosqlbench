@@ -29,10 +29,13 @@ import io.nosqlbench.engine.api.activityapi.input.Input;
 import io.nosqlbench.engine.api.activityapi.output.Output;
 import io.nosqlbench.engine.api.activityapi.ratelimits.RateLimiter;
 import io.nosqlbench.api.engine.activityimpl.ActivityDef;
+import io.nosqlbench.engine.api.activityapi.ratelimits.RateLimiters;
+import io.nosqlbench.engine.api.activityapi.ratelimits.RateSpec;
 import io.nosqlbench.engine.api.activityimpl.SlotStateTracker;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -52,6 +55,8 @@ import static io.nosqlbench.engine.api.activityapi.core.RunState.*;
 public class CoreMotor<D> implements ActivityDefObserver, Motor<D>, Stoppable {
 
     private static final Logger logger = LogManager.getLogger(CoreMotor.class);
+
+    private volatile long flagConfigChange=0L;
 
     private final long slotId;
 
@@ -88,7 +93,8 @@ public class CoreMotor<D> implements ActivityDefObserver, Motor<D>, Stoppable {
     public CoreMotor(
             Activity activity,
             long slotId,
-            Input input) {
+            Input input
+    ) {
         this.activity = activity;
         this.slotId = slotId;
         setInput(input);
@@ -192,8 +198,6 @@ public class CoreMotor<D> implements ActivityDefObserver, Motor<D>, Stoppable {
             optrackerBlockCounter = activity.getInstrumentation().getOrCreateOpTrackerBlockedCounter();
 
             strideRateLimiter = activity.getStrideLimiter();
-            cycleRateLimiter = activity.getCycleLimiter();
-
 
             if (slotState.get() == Finished) {
                 logger.warn("Input was already exhausted for slot " + slotId + ", remaining in finished state.");
@@ -216,7 +220,6 @@ public class CoreMotor<D> implements ActivityDefObserver, Motor<D>, Stoppable {
 
             long strideDelay = 0L;
             long cycleDelay = 0L;
-            long phaseDelay = 0L;
 
             // Reviewer Note: This separate of code paths was used to avoid impacting the
             // previously logic for the SyncAction type. It may be consolidated later once
@@ -236,6 +239,11 @@ public class CoreMotor<D> implements ActivityDefObserver, Motor<D>, Stoppable {
                 }
 
                 while (slotState.get() == Running) {
+
+                    if (flagConfigChange>0) {
+                        logger.debug("flagged for config change, calling update from within motor thread.");
+                        applyThreadLocalConfigChange(activity.getActivityDef());
+                    }
 
                     CycleSegment cycleSegment = null;
 
@@ -326,7 +334,7 @@ public class CoreMotor<D> implements ActivityDefObserver, Motor<D>, Stoppable {
                 }
 
 
-            } else if (action instanceof SyncAction) {
+            } else if (action instanceof SyncAction sync) {
 
                 cycleServiceTimer = activity.getInstrumentation().getOrCreateCyclesServiceTimer();
                 strideServiceTimer = activity.getInstrumentation().getOrCreateStridesServiceTimer();
@@ -335,9 +343,12 @@ public class CoreMotor<D> implements ActivityDefObserver, Motor<D>, Stoppable {
                     throw new RuntimeException("The async parameter was given for this activity, but it does not seem to know how to do async.");
                 }
 
-                SyncAction sync = (SyncAction) action;
-
                 while (slotState.get() == Running) {
+
+                    if (flagConfigChange>0) {
+                        logger.debug("flagged for config change, calling update from within motor thread.");
+                        applyThreadLocalConfigChange(activity.getActivityDef());
+                    }
 
                     CycleSegment cycleSegment = null;
                     CycleResultSegmentBuffer segBuffer = new CycleResultSegmentBuffer(stride);
@@ -387,9 +398,7 @@ public class CoreMotor<D> implements ActivityDefObserver, Motor<D>, Stoppable {
                                 logger.trace("cycle " + cyclenum);
 
                                 // runCycle
-                                long phaseStart = System.nanoTime();
                                 result = sync.runCycle(cyclenum);
-                                long phaseEnd = System.nanoTime();
 
                             } finally {
                                 long cycleEnd = System.nanoTime();
@@ -429,6 +438,19 @@ public class CoreMotor<D> implements ActivityDefObserver, Motor<D>, Stoppable {
         }
     }
 
+    private void applyThreadLocalConfigChange(ActivityDef def) {
+        Optional<RateSpec> specForThread = def.getParams().getOptionalNamedParameter("tlrate", "threadlocal_rate").map(RateSpec::new);
+        if (specForThread.isPresent()) {
+            if (def.getThreads()>500) {
+                logger.warn("Using thread-local rate limiters with high thread counts like '" + def.getThreads() + "' is not advised. Each rate limiters maintains an additional thread.");
+            }
+            cycleRateLimiter=RateLimiters.createOrUpdateThreadLocal(def, "tlcycles", specForThread.get());
+        } else {
+            cycleRateLimiter=activity.getCycleLimiter();
+        }
+        flagConfigChange=0L;
+    }
+
 
     @Override
     public String toString() {
@@ -439,15 +461,24 @@ public class CoreMotor<D> implements ActivityDefObserver, Motor<D>, Stoppable {
     public void onActivityDefUpdate(ActivityDef activityDef) {
 
         for (Object component : (new Object[]{input, opTracker, action, output})) {
-            if (component instanceof ActivityDefObserver) {
-                ((ActivityDefObserver) component).onActivityDefUpdate(activityDef);
+            if (component instanceof ActivityDefObserver observer) {
+                observer.onActivityDefUpdate(activityDef);
             }
         }
 
         this.stride = activityDef.getParams().getOptionalInteger("stride").orElse(1);
-        strideRateLimiter = activity.getStrideLimiter();
-        cycleRateLimiter = activity.getCycleLimiter();
 
+        strideRateLimiter = activity.getStrideLimiter();
+
+        // This will be null if there is no activity-level cycle rate limiter,
+        // in which case any thread-local rate limiter will be picked up by this motor in-thread
+        // It is only defined here when the rate limiter is not cycle-specific, for pre-start manipulation
+        // Also, it needs to avoid overwriting the thread-local version in case there is an idempotent reinit to null
+        if (this.cycleRateLimiter==null) {
+            this.cycleRateLimiter=activity.getCycleLimiter();
+        }
+
+        this.flagConfigChange=1L;
     }
 
     @Override

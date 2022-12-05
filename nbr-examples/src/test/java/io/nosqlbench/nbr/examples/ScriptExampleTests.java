@@ -262,10 +262,17 @@ public class ScriptExampleTests {
     }
 
     @Test
-    public void testCycleRateChangeNewMetrics() {
+    public void testCycleRateChange() {
         ScenarioResult scenarioResult = runScenario("cycle_rate_change");
         String ioLog = scenarioResult.getIOLog();
         assertThat(ioLog).contains("cycles adjusted, exiting on iteration");
+    }
+
+    @Test
+    public void testCycleRateChangeThreadLocal() {
+        ScenarioResult scenarioResult = runScenario("cycle_rate_change_threadlocal");
+        String ioLog = scenarioResult.getIOLog();
+        assertThat(ioLog).contains("total cycles adjusted, exiting on iteration");
     }
 
     @Test

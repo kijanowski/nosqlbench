@@ -24,6 +24,30 @@ import org.apache.logging.log4j.Logger;
 public class RateLimiters {
     private final static Logger logger = LogManager.getLogger(RateLimiters.class);
 
+    private final static ThreadLocal<RateLimiter> tlrl = new ThreadLocal<>();
+
+    /**
+     * Allow for a thread-local rate limiter to be created. Only one namespace is supported here.
+     * @param def The NBNamedElement, for naming and identification
+     * @param label a label to be applied to the rate limiter within the named element
+     * @param spec the specifier for the rate limiter
+     * @return a new or modified rate limiter
+     */
+    public static synchronized RateLimiter createOrUpdateThreadLocal(NBNamedElement def, String label, RateSpec spec) {
+
+        RateLimiter rateLimiter = tlrl.get();
+
+        if (rateLimiter==null) {
+            rateLimiter = new HybridRateLimiter(def, label+":"+Thread.currentThread().getName(), spec);
+            logger.info("Using thread-local rate limiter: " + rateLimiter);
+            tlrl.set(rateLimiter);
+        } else {
+            rateLimiter.applyRateSpec(spec);
+            logger.info("updated thread-local rate limiter: " + rateLimiter);
+        }
+        return rateLimiter;
+    }
+
     public static synchronized RateLimiter createOrUpdate(NBNamedElement def, String label, RateLimiter extant, RateSpec spec) {
 
         if (extant == null) {

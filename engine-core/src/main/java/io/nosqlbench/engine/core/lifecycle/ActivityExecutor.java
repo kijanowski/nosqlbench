@@ -98,7 +98,7 @@ public class ActivityExecutor implements ActivityController, ParameterMap.Listen
      * <p>The startActivity method may be called to true-up the number of active motors in an activity executor after
      * changes to threads.</p>
      */
-    public synchronized void startActivity() {
+    public synchronized Activity startActivity() {
         logger.info("starting activity " + activity.getAlias() + " for cycles " + activity.getCycleSummary());
         Annotators.recordAnnotation(Annotation.newBuilder()
                 .session(sessionId)
@@ -125,6 +125,7 @@ public class ActivityExecutor implements ActivityController, ParameterMap.Listen
         adjustToActivityDef(activity.getActivityDef());
         activity.setRunState(RunState.Running);
         activitylogger.debug("START/after alias=(" + activity.getAlias() + ")");
+        return activity;
     }
 
     /**

@@ -153,9 +153,6 @@ public class RateSpec {
 
     public RateSpec(ParameterMap.NamedParameter tuple) {
         this(tuple.value);
-        if (tuple.name.startsWith("co_")) {
-            logger.warn("The co_ prefix on " + tuple.name + " is no longer needed. All rate limiters now provide standard coordinated omission metrics.");
-        }
     }
 
     public RateSpec(String spec) {

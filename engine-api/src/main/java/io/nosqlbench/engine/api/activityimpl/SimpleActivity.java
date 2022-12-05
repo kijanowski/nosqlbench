@@ -72,7 +72,6 @@ public class SimpleActivity implements Activity, ProgressCapable, ActivityDefObs
     private RunState runState = RunState.Uninitialized;
     private RateLimiter strideLimiter;
     private RateLimiter cycleLimiter;
-    private RateLimiter phaseLimiter;
     private ActivityController activityController;
     private ActivityInstrumentation activityInstrumentation;
     private PrintWriter console;
@@ -95,7 +94,7 @@ public class SimpleActivity implements Activity, ProgressCapable, ActivityDefObs
             } else {
                 activityDef.getParams().set("alias",
                     activityDef.getActivityType().toUpperCase(Locale.ROOT)
-                        + String.valueOf(nameEnumerator++));
+                        + nameEnumerator++);
             }
         }
     }
@@ -217,7 +216,7 @@ public class SimpleActivity implements Activity, ProgressCapable, ActivityDefObs
     @Override
     public void closeAutoCloseables() {
         for (AutoCloseable closeable : closeables) {
-            logger.debug("CLOSING " + closeable.getClass().getCanonicalName() + ": " + closeable.toString());
+            logger.debug("CLOSING " + closeable.getClass().getCanonicalName() + ": " + closeable);
             try {
                 closeable.close();
             } catch (Exception e) {
@@ -228,63 +227,13 @@ public class SimpleActivity implements Activity, ProgressCapable, ActivityDefObs
     }
 
     @Override
-    public RateLimiter getCycleLimiter() {
-        return this.cycleLimiter;
-    }
-
-    @Override
-    public synchronized void setCycleLimiter(RateLimiter rateLimiter) {
-        this.cycleLimiter = rateLimiter;
-    }
-
-    @Override
-    public synchronized RateLimiter getCycleRateLimiter(Supplier<? extends RateLimiter> s) {
-        if (cycleLimiter == null) {
-            cycleLimiter = s.get();
-        }
-        return cycleLimiter;
-    }
-
-    @Override
     public synchronized RateLimiter getStrideLimiter() {
         return this.strideLimiter;
     }
 
     @Override
-    public synchronized void setStrideLimiter(RateLimiter rateLimiter) {
-        this.strideLimiter = rateLimiter;
-    }
-
-    @Override
-    public synchronized RateLimiter getStrideRateLimiter(Supplier<? extends RateLimiter> s) {
-        if (strideLimiter == null) {
-            strideLimiter = s.get();
-        }
-        return strideLimiter;
-    }
-
-    @Override
-    public RateLimiter getPhaseLimiter() {
-        return phaseLimiter;
-    }
-
-
-    @Override
     public Timer getResultTimer() {
         return ActivityMetrics.timer(getActivityDef(), "result", getParams().getOptionalInteger("hdr_digits").orElse(4));
-    }
-
-    @Override
-    public void setPhaseLimiter(RateLimiter rateLimiter) {
-        this.phaseLimiter = rateLimiter;
-    }
-
-    @Override
-    public synchronized RateLimiter getPhaseRateLimiter(Supplier<? extends RateLimiter> supplier) {
-        if (phaseLimiter == null) {
-            phaseLimiter = supplier.get();
-        }
-        return phaseLimiter;
     }
 
     @Override
@@ -326,21 +275,24 @@ public class SimpleActivity implements Activity, ProgressCapable, ActivityDefObs
         initOrUpdateRateLimiters(activityDef);
     }
 
-    public synchronized void initOrUpdateRateLimiters(ActivityDef activityDef) {
 
+    public synchronized void initOrUpdateRateLimiters(ActivityDef activityDef) {
         activityDef.getParams().getOptionalNamedParameter("striderate")
             .map(RateSpec::new)
             .ifPresent(spec -> strideLimiter = RateLimiters.createOrUpdate(this.getActivityDef(), "strides", strideLimiter, spec));
 
         activityDef.getParams().getOptionalNamedParameter("cyclerate", "targetrate", "rate")
-            .map(RateSpec::new).ifPresent(
-                spec -> cycleLimiter = RateLimiters.createOrUpdate(this.getActivityDef(), "cycles", cycleLimiter, spec));
-
-        activityDef.getParams().getOptionalNamedParameter("phaserate")
             .map(RateSpec::new)
-            .ifPresent(spec -> phaseLimiter = RateLimiters.createOrUpdate(this.getActivityDef(), "phases", phaseLimiter, spec));
-
+            .ifPresent(spec -> cycleLimiter = RateLimiters.createOrUpdate(this.getActivityDef(), "cycles", cycleLimiter, spec));
     }
+
+    @Override
+    public synchronized RateLimiter getCycleLimiter() {
+        return this.cycleLimiter;
+    }
+
+
+
 
     /**
      * Modify the provided ActivityDef with defaults for stride and cycles, if they haven't been provided, based on the
@@ -392,7 +344,7 @@ public class SimpleActivity implements Activity, ProgressCapable, ActivityDefObs
         if (threadSpec.isPresent()) {
             String spec = threadSpec.get();
             int processors = Runtime.getRuntime().availableProcessors();
-            if (spec.toLowerCase().equals("auto")) {
+            if (spec.equalsIgnoreCase("auto")) {
                 int threads = processors * 10;
                 if (threads > activityDef.getCycleCount()) {
                     threads = (int) activityDef.getCycleCount();
@@ -652,7 +604,7 @@ public class SimpleActivity implements Activity, ProgressCapable, ActivityDefObs
             return stmtsDocList;
 
         } catch (Exception e) {
-            throw new OpConfigError("Error loading op templates: " + e.toString(), workloadSource, e);
+            throw new OpConfigError("Error loading op templates: " + e, workloadSource, e);
         }
 
     }

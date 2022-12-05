@@ -42,6 +42,7 @@ public abstract class BaseDriverAdapter<R extends Op, S> implements DriverAdapte
      * BaseDriverAdapter will take any provided functions from {@link #getOpStmtRemappers()}
      * and {@link #getOpFieldRemappers()} and construct a preprocessor list. These are applied
      * successively to the op template fields so long as remapping occurs.
+     *
      * @return a list of preprocessors for op template fields
      */
     @Override
@@ -112,6 +113,7 @@ public abstract class BaseDriverAdapter<R extends Op, S> implements DriverAdapte
     /**
      * <p>Provide a list of field remappers which operate on arbitrary fields.
      * Each function is applied to the op template fields. </p>
+     *
      * @return
      */
     @Override
@@ -174,7 +176,12 @@ public abstract class BaseDriverAdapter<R extends Op, S> implements DriverAdapte
         return ConfigModel.of(BaseDriverAdapter.class)
             .add(Param.optional("threads").setRegex("\\d+|\\d+x|auto").setDescription("number of concurrent operations, controlled by threadpool"))
             .add(Param.optional("striderate", String.class, "rate limit for strides per second"))
-            .add(Param.optional(List.of("cyclerate", "targetrate", "rate"), String.class, "rate limit for cycles per second"))
+            .add(Param.optional(List.of("cyclerate", "targetrate", "rate"), String.class, "rate limit for cycles per second")
+                .notWith("tlrate")
+            )
+            .add(Param.optional(List.of("tlrate", "threadlocal_rate"), String.class, "rate limit for cycles per second, per thread")
+                .notWith("cyclerate")
+            )
             .asReadOnly();
     }
 

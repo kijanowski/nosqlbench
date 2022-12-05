@@ -209,10 +209,6 @@ public class Scenario implements Callable<ScenarioResult> {
 
         scriptEngine.put("params", scenarioScriptParams);
 
-//            scriptEngine.put("scenario", scenarioController);
-//            scriptEngine.put("metrics", new PolyglotMetricRegistryBindings(metricRegistry));
-//            scriptEngine.put("activities", new NashornActivityBindings(scenarioController));
-
         scriptEngine.put("scenario", new PolyglotScenarioController(scenarioController));
         scriptEngine.put("metrics", new PolyglotMetricRegistryBindings(metricRegistry));
         scriptEngine.put("activities", new NashornActivityBindings(scenarioController));

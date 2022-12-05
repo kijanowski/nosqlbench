@@ -60,8 +60,9 @@ public class ScenarioController {
      * by the alias parameter.
      *
      * @param activityDef string in alias=value1;driver=value2;... format
+     * @return The activity that has been started
      */
-    public synchronized void start(ActivityDef activityDef) {
+    public synchronized Activity start(ActivityDef activityDef) {
         Annotators.recordAnnotation(Annotation.newBuilder()
             .session(sessionId)
             .now()
@@ -74,8 +75,7 @@ public class ScenarioController {
 
         ActivityExecutor activityExecutor = getActivityExecutor(activityDef, true);
         scenariologger.debug("START " + activityDef.getAlias());
-        activityExecutor.startActivity();
-
+        return activityExecutor.startActivity();
     }
 
     /**
@@ -83,10 +83,11 @@ public class ScenarioController {
      * the scenario by the alias parameter.
      *
      * @param activityDefMap A map containing the activity definition
+     * @return the activity that has been started
      */
-    public synchronized void start(Map<String, String> activityDefMap) {
+    public synchronized Activity start(Map<String, String> activityDefMap) {
         ActivityDef ad = new ActivityDef(new ParameterMap(activityDefMap));
-        start(ad);
+        return start(ad);
     }
 
     /**
@@ -94,14 +95,15 @@ public class ScenarioController {
      * stopped an activity and want to start it again.
      *
      * @param alias the alias of an activity that is already known to the scenario
+     * @return The activity that has been started.
      */
-    public synchronized void start(String alias) {
-        start(ActivityDef.parseActivityDef(alias));
+    public Activity start(String alias) {
+        return start(ActivityDef.parseActivityDef(alias));
     }
 
-    public synchronized void run(int timeout, Map<String, String> activityDefMap) {
+    public synchronized Activity run(int timeout, Map<String, String> activityDefMap) {
         ActivityDef ad = new ActivityDef(new ParameterMap(activityDefMap));
-        run(timeout, ad);
+        return run(timeout, ad);
     }
 
     /**
@@ -110,7 +112,7 @@ public class ScenarioController {
      * @param timeout     seconds to await completion of the activity.
      * @param activityDef A definition for an activity to run
      */
-    public synchronized void run(int timeout, ActivityDef activityDef) {
+    public synchronized Activity run(int timeout, ActivityDef activityDef) {
         Annotators.recordAnnotation(Annotation.newBuilder()
             .session(sessionId)
             .now()
@@ -127,24 +129,25 @@ public class ScenarioController {
         scenariologger.debug(" (RUN/AWAIT before) alias=" + activityDef.getAlias());
         boolean completed = activityExecutor.awaitCompletion(timeout);
         scenariologger.debug(" (RUN/AWAIT after) completed=" + activityDef.getAlias());
+        return activityExecutor.getActivity();
     }
 
-    public synchronized void run(int timeout, String activityDefString) {
+    public synchronized Activity run(int timeout, String activityDefString) {
         ActivityDef activityDef = ActivityDef.parseActivityDef(activityDefString);
-        run(timeout, activityDef);
+        return run(timeout, activityDef);
     }
 
-    public synchronized void run(Map<String, String> activityDefMap) {
-        run(Integer.MAX_VALUE, activityDefMap);
+    public synchronized Activity run(Map<String, String> activityDefMap) {
+        return run(Integer.MAX_VALUE, activityDefMap);
     }
 
-    public synchronized void run(String activityDefString) {
-        run(Integer.MAX_VALUE, activityDefString);
+    public synchronized Activity run(String activityDefString) {
+        return run(Integer.MAX_VALUE, activityDefString);
     }
 
 
-    public synchronized void run(ActivityDef activityDef) {
-        run(Integer.MAX_VALUE, activityDef);
+    public Activity run(ActivityDef activityDef) {
+        return run(Integer.MAX_VALUE, activityDef);
     }
 
 

@@ -228,6 +228,7 @@ public class ConfigModel implements NBConfigModel {
     @Override
     public void assertValidConfig(Map<String, ?> config) {
         ConfigModel expanded = expand(this, config);
+        expanded.assertNoConflictingFields(config);
         expanded.assertRequiredFields(config);
         expanded.assertNoExtraneousFields(config);
         expanded.assertDistinctSynonyms(config);
@@ -235,7 +236,7 @@ public class ConfigModel implements NBConfigModel {
 
     private ConfigModel expand(ConfigModel configModel, Map<String, ?> config) {
         List<Param<?>> expanders = configModel.params.stream()
-            .filter(p -> p.getExpander()!=null).toList();
+            .filter(p -> p.getExpander() != null).toList();
 
         for (Param<?> expandingParameter : expanders) {
             for (String name : expandingParameter.getNames()) {
@@ -288,6 +289,33 @@ public class ConfigModel implements NBConfigModel {
         }
     }
 
+    private void assertNoConflictingFields(Map<String, ?> config) {
+        for (String configkey : config.keySet()) {
+            Param<?> fromElement = this.paramsByName.get(configkey);
+            if (fromElement == null) {
+                continue;
+            }
+            Set<String> fromNames = new HashSet<>(fromElement.getNames());
+            Set<String> notWithNames = new HashSet<>();
+            for (String notWith : fromElement.getNotWith()) {
+                Param<?> notWithParam = this.paramsByName.get(notWith);
+                if (notWithParam == null) {
+                    throw new RuntimeException("Invalid notWith spec: '" + configkey + "' notWith '" + notWith + "', since both have to be defined.");
+                }
+                notWithNames.addAll(notWithParam.getNames());
+            }
+            for (String fromName : fromNames) {
+                for (String notWithName : notWithNames) {
+                    if (config.containsKey(fromName) && config.containsKey(notWithName)) {
+                        throw new BasicError("Invalid config: Both '" + fromName + "' and '" + notWithName +"' were specified. You can't use them both at the same time.");
+                    }
+                }
+            }
+
+        }
+    }
+
+
     private void assertNoExtraneousFields(Map<String, ?> config) {
         // For each provided configuration element ...
         for (String configkey : config.keySet()) {
@@ -318,11 +346,10 @@ public class ConfigModel implements NBConfigModel {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("[").append(
-                params.stream().map(p -> p.getNames().get(0)).collect(Collectors.joining(",")))
-            .append("]");
+        String sb = "[" +
+            params.stream().map(p -> p.getNames().get(0)).collect(Collectors.joining(",")) +
+            "]";
 
-        return sb.toString();
+        return sb;
     }
 }
